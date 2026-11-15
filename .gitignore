@@ -1,0 +1,9 @@
+*.app
+dist/
+build/
+backup*/
+Archiwum*/
+*.dmg
+__pycache__/
+.DS_Store
+*.pyc
