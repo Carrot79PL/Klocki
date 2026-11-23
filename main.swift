@@ -150,9 +150,15 @@ final class HUD: SKScene {
     }
     var intro: SKNode?
     var introDone: (() -> Void)?
+    let sign = SKSpriteNode()          // podpis studia w prawym dolnym rogu (jak w Bilardzie)
 
     override init(size: CGSize) {
         super.init(size: size)
+        if let u = Bundle.main.url(forResource: "podpis_logo", withExtension: "png"),
+           let img = NSImage(contentsOf: u)?.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+            sign.texture = SKTexture(cgImage: img); sign.anchorPoint = CGPoint(x: 1, y: 0); sign.alpha = 0; sign.zPosition = 20
+            addChild(sign)
+        }
         scaleMode = .resizeFill
         backgroundColor = .clear
         shade.anchorPoint = .zero
@@ -170,6 +176,9 @@ final class HUD: SKScene {
     override func didChangeSize(_ oldSize: CGSize) {
         let s = CGSize(width: size.width + 4, height: size.height + 4)
         shade.size = s; flashSprite.size = s; danger.size = s
+        let w = max(120, size.height * 0.17)
+        sign.size = CGSize(width: w, height: w * 292 / 800)
+        sign.position = CGPoint(x: size.width - 20, y: 14)
     }
 
     func text(_ t: String, _ size: CGFloat, _ color: NSColor = .white, font: String = "AvenirNext-DemiBold",
@@ -294,28 +303,29 @@ final class HUD: SKScene {
 
     // MARK: Intro z logo studia
 
+    var intro3d: Intro3DView?
     func playIntro(_ done: @escaping () -> Void) {
         introDone = done
-        let o = BluerootIntro.node(size: size, scale: px)     // intro BLUEROOT: pixel art → wektor (Intro.swift)
-        o.zPosition = 200
-        o.run(.sequence([.wait(forDuration: BluerootIntro.hold), .fadeOut(withDuration: 0.8),
-                         .run { [weak self] in DispatchQueue.main.async { self?.finishIntro() } }]))
-        addChild(o)
-        intro = o
+        intro = SKNode()          // znacznik: intro trwa
+        let host = NSApp.windows.first(where: { $0.isVisible && !($0 is NSPanel) })?.contentView
+        let v = Intro3DView(frame: host?.bounds ?? .zero, kind: .blocks)
+        v.autoresizingMask = [.width, .height]
+        host?.addSubview(v)
+        v.onDone = { [weak self] in self?.finishIntro() }
+        v.build()
+        intro3d = v
         shade.removeAllActions()
         shade.alpha = 0
         shade.color = .black
         shade.size = CGSize(width: size.width + 4, height: size.height + 4)
     }
     func skipIntro() {
-        guard let o = intro else { return }
-        o.removeAllActions()
-        o.run(.sequence([.fadeOut(withDuration: 0.35), .run { [weak self] in DispatchQueue.main.async { self?.finishIntro() } }]))
+        intro3d?.finish()
     }
     private func finishIntro() {
         guard intro != nil else { return }
-        intro?.removeFromParent()
-        intro = nil
+        intro = nil; intro3d = nil
+        sign.run(.fadeAlpha(to: 0.6, duration: 1.2))
         introDone?()
         introDone = nil
     }
