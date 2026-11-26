@@ -308,12 +308,8 @@ final class HUD: SKScene {
     func playIntro(_ done: @escaping () -> Void) {
         introDone = done
         intro = SKNode()          // znacznik: intro trwa
-        let host = NSApp.windows.first(where: { $0.isVisible && !($0 is NSPanel) })?.contentView
-        if let host = host {
-            tmIntroView = TMIntro.play(in: host) { [weak self] in self?.finishIntro() }
-        } else {
-            DispatchQueue.main.async { [weak self] in self?.finishIntro() }
-        }
+        // intro studia gra już w AppDelegate (przed zbudowaniem gry) — tu tylko domykamy stan HUD
+        DispatchQueue.main.async { [weak self] in self?.finishIntro() }
         shade.removeAllActions()
         shade.alpha = 0
         shade.color = .black
@@ -3112,9 +3108,8 @@ final class Game: NSObject {
 
 final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
     var window: NSWindow!
-    var game: Game!
+    var game: Game?
     var started = false
-    let cover = NSView()
 
     func applicationDidFinishLaunching(_ n: Notification) {
         let menu = NSMenu(), item = NSMenuItem(), sub = NSMenu()
@@ -3131,23 +3126,27 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let root = NSView(frame: NSRect(origin: .zero, size: frame.size))
         root.wantsLayer = true
         root.layer?.backgroundColor = NSColor.black.cgColor
-        let v = GameView(frame: root.bounds)
-        v.autoresizingMask = [.width, .height]
-        root.addSubview(v)
-        cover.frame = root.bounds
-        cover.autoresizingMask = [.width, .height]
-        cover.wantsLayer = true
-        cover.layer?.backgroundColor = NSColor(srgbRed: 7 / 255, green: 8 / 255, blue: 15 / 255, alpha: 1).cgColor
-        root.addSubview(cover)
         window.contentView = root
-        game = Game(view: v)
-        game.onDisplay = { [weak self] m in self?.applyDisplay(m) }
         window.delegate = self
         window.makeKeyAndOrderFront(nil)
-        window.makeFirstResponder(v)
         NSApp.activate(ignoringOtherApps: true)
-        if game.display == 0 { window.toggleFullScreen(nil) } else { setSize(AppDelegate.sizes[game.display]); DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { [weak self] in self?.begin() } }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in self?.begin() }
+        // intro studia rusza natychmiast na czarnym oknie; gra (scena, muzyka, timery) powstaje dopiero w completion
+        TMIntro.play(in: root) { [weak self] in self?.buildGame(in: root) }
+        let display = UserDefaults.standard.integer(forKey: "ekran")
+        if display == 0 { window.toggleFullScreen(nil) } else { setSize(AppDelegate.sizes[display]) }
+    }
+
+    func buildGame(in root: NSView) {
+        guard !started else { return }
+        started = true
+        let v = GameView(frame: root.bounds)
+        v.autoresizingMask = [.width, .height]
+        root.addSubview(v, positioned: .below, relativeTo: nil)     // pod widokiem intra, który jeszcze się wygasza
+        let g = Game(view: v)
+        game = g
+        g.onDisplay = { [weak self] m in self?.applyDisplay(m) }
+        window.makeFirstResponder(v)
+        g.start()
     }
     var pendingSize: NSSize?
     static let sizes = [NSSize.zero, NSSize(width: 1280, height: 720), NSSize(width: 1920, height: 1080), NSSize(width: 2560, height: 1440)]
@@ -3160,23 +3159,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate {
         let vis = window.screen?.visibleFrame.size ?? s
         window.setContentSize(NSSize(width: min(s.width, vis.width), height: min(s.height, vis.height - 32)))
         window.center()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in self?.game.relayout() }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in self?.game?.relayout() }
     }
     func windowDidExitFullScreen(_ n: Notification) {
         if let s = pendingSize { pendingSize = nil; setSize(s) }
     }
     func windowDidEnterFullScreen(_ n: Notification) {
-        if started { DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in self?.game.relayout() } }
- DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { self.begin() } }
-    func begin() {
-        guard !started else { return }
-        started = true
-        game.start()
-        // zasłona znika dopiero, gdy intro (z własnym ciemnym tłem) jest już na ekranie
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) { [weak self] in
-            NSAnimationContext.runAnimationGroup({ $0.duration = 0.25; self?.cover.animator().alphaValue = 0 },
-                                                 completionHandler: { self?.cover.removeFromSuperview() })
-        }
+        if started { DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in self?.game?.relayout() } }
     }
     func applicationShouldTerminateAfterLastWindowClosed(_ s: NSApplication) -> Bool { true }
 }
