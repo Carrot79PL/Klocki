@@ -304,16 +304,16 @@ final class HUD: SKScene {
     // MARK: Intro z logo studia
 
     var intro3d: Intro3DView?
+    var tmIntroView: NSView?
     func playIntro(_ done: @escaping () -> Void) {
         introDone = done
         intro = SKNode()          // znacznik: intro trwa
         let host = NSApp.windows.first(where: { $0.isVisible && !($0 is NSPanel) })?.contentView
-        let v = Intro3DView(frame: host?.bounds ?? .zero, kind: .blocks)
-        v.autoresizingMask = [.width, .height]
-        host?.addSubview(v)
-        v.onDone = { [weak self] in self?.finishIntro() }
-        v.build()
-        intro3d = v
+        if let host = host {
+            tmIntroView = TMIntro.play(in: host) { [weak self] in self?.finishIntro() }
+        } else {
+            DispatchQueue.main.async { [weak self] in self?.finishIntro() }
+        }
         shade.removeAllActions()
         shade.alpha = 0
         shade.color = .black
@@ -324,7 +324,7 @@ final class HUD: SKScene {
     }
     private func finishIntro() {
         guard intro != nil else { return }
-        intro = nil; intro3d = nil
+        intro = nil; intro3d = nil; tmIntroView = nil
         sign.run(.fadeAlpha(to: 0.6, duration: 1.2))
         introDone?()
         introDone = nil

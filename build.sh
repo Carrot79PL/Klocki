@@ -5,7 +5,7 @@ cd "$(dirname "$0")"
 APP=Klocki.app
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
-swiftc -O -target arm64-apple-macos14.0 -o "$APP/Contents/MacOS/Klocki" Music.swift Player.swift Intro.swift Intro3D.swift main.swift -framework Cocoa -framework SceneKit -framework SpriteKit -framework AVFoundation
+swiftc -O -target arm64-apple-macos14.0 -o "$APP/Contents/MacOS/Klocki" Music.swift Player.swift Intro.swift Intro3D.swift LogoData.swift Bake.swift PenSound.swift FilmSound.swift TMIntroView.swift TMIntroKit.swift main.swift -framework Cocoa -framework SceneKit -framework SpriteKit -framework AVFoundation -framework Metal -framework MetalKit -framework MetalPerformanceShaders
 cp Resources/wordmark.svg Resources/blueroot.svg Resources/podpis_* "$APP/Contents/Resources/"
 # ikona: generowana z Icon.swift, gdy jej brak albo skrypt ikony jest nowszy
 if [ ! -f Resources/AppIcon.icns ] || [ Icon.swift -nt Resources/AppIcon.icns ]; then
